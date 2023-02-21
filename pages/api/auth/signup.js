@@ -1,10 +1,13 @@
 import { hashPassword } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+  if (req.method !== "POST") {
+    return;
+  }
+
   const data = req.body;
   const { email, password } = data;
-
   if (
     !email ||
     !email.includes("@") ||
@@ -20,7 +23,14 @@ export default async function handler(req, res) {
   const client = await connectToDatabase();
   const db = client.db("auth-demo");
 
-  const hashedPassword = hashPassword(password);
+  const existingUser = await db.collection("users").findOne({ email: email });
+  if (existingUser) {
+    res.status(422).json({ message: "User exists already" });
+    client.close();
+    return;
+  }
+
+  const hashedPassword = await hashPassword(password);
 
   const result = await db.collection("users").insertOne({
     email: email,
@@ -28,4 +38,7 @@ export default async function handler(req, res) {
   });
 
   res.status(201).json({ message: "Created user" });
+  client.close();
 }
+
+export default handler;
